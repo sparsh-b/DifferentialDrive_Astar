@@ -6,7 +6,7 @@
 
 # Instructions to run
 - `cd scripts`
-- python3 diff_drive_Astar.py --start <space-separated x y theta> --end <space-separated x y> --rpm <space-separated rpm1 & rpm2> --clearance <clearance in mm>
+- `python3 diff_drive_Astar.py --start <space-separated x y theta> --end <space-separated x y> --rpm <space-separated rpm1 & rpm2> --clearance <clearance in mm>`
 - In the above command, x & y are mm, theta is in degrees
 - x & y valid range is [0, 9999].
 - Example: `python3 diff_drive_Astar.py --start 1000 1000 270 --goal 9000 9000 --rpm 5 10 --clearance 5`
