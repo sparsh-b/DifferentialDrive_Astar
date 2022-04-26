@@ -47,13 +47,14 @@ def backtrack(final_node):
     return path
 
 def round_off(child_x, child_y, child_th):
+    theta_threshold = 2
     while child_th < 0:
         child_th += 360
     while child_th >= 360:
         child_th -= 360
-    if child_th%30 > 15: # [0,15] degrees -> child_th=0, (15,45]->1, (45,75]->2 & so on
-        child_th += 30
-    child_th = (child_th // 30)*30
+    if child_th%theta_threshold > theta_threshold/2: # [0,15] degrees -> child_th=0, (15,45]->1, (45,75]->2 & so on
+        child_th += theta_threshold
+    child_th = (child_th // theta_threshold)*theta_threshold
     child_x = round(child_x)
     child_y = round(child_y)
     return child_x, child_y, child_th
@@ -74,7 +75,6 @@ def generate_children(parent, goal_node, rpms, num_generated, nodes, nav_space, 
     rpm6 = [rpms[1], rpms[0]]
     rpm7 = [rpms[0], rpms[1]]
     eight_rpms = [rpm0,rpm1,rpm2,rpm3,rpm4,rpm5,rpm6,rpm7]
-    # eight_rpms = [rpm7]
     r = 38/scale #in mm
     L = 354/scale #in mm
     dt = 0.1 #in seconds
@@ -105,14 +105,13 @@ def generate_children(parent, goal_node, rpms, num_generated, nodes, nav_space, 
             nav_space_disp = cv2.line(nav_space_disp, (int(xs), int(10000/scale-1-ys)), (int(child_x), int(10000/scale-1-child_y)), (255,0,0), 1)
         child_x, child_y, child_th = round_off(child_x, child_y, degrees(child_th))
         new_cost = child_common_cost + additional_cost + euclidean_dist(child_x, goal_node, child_y)
-        print('[{},{}]: ({},{}) -> ({},{}) | {}'.format(child_rpm[0], child_rpm[1], parent.x, parent.y, child_x, child_y, new_cost))
+        # print('[{},{}]: ({},{}) -> ({},{}) | {}'.format(child_rpm[0], child_rpm[1], parent.x, parent.y, child_x, child_y, new_cost))
 
         if (child_x < 0) or (child_y < 0):
             continue
         if (child_x >= 10000/scale) or (child_y >= 10000/scale):
             continue
         if nav_space[int(10000/scale-1-child_y), child_x] == 0:
-            print(child_x, child_y, '#######')
             continue
         
         if check_if_duplicate(child_x, child_y, child_th, nodes):
@@ -123,8 +122,6 @@ def generate_children(parent, goal_node, rpms, num_generated, nodes, nav_space, 
                     if open_q[idx][2] == Node(child_x, child_y, child_th):
                         open_q[idx] = (new_cost, open_q[idx][1], open_q[idx][2])
                         hq.heapify(open_q)
-            else:
-                print(child_x, child_y, '@@@@@@@')
         else:
             num_generated += 1
             nodes[(child_x, child_y, child_th)] =  {'parentx': parent.x, 'parenty': parent.y, 'parentth': parent.th, 'cost': new_cost}
@@ -153,6 +150,7 @@ def visualize(grid_size, grid, path, nav_space_disp):
         r = 38/scale #in mm
         L = 354/scale #in mm
         dt = 0.1 #in seconds
+        t_max = 1
         th = radians(prev_node[2])
         
         for child_rpm in eight_rpms:
@@ -164,7 +162,7 @@ def visualize(grid_size, grid, path, nav_space_disp):
             common_multiple = 0.5*r * (child_rpm[0] + child_rpm[1]) * dt
             dth = (r/L) * (child_rpm[0] - child_rpm[1]) * dt
             sub_path = []
-            while t<1:
+            while t<t_max:
                 t += dt
                 dx = common_multiple * cos(child_th)
                 dy = common_multiple * sin(child_th)
@@ -177,19 +175,13 @@ def visualize(grid_size, grid, path, nav_space_disp):
                 sub_path.append([[xs, child_x], [ys, child_y]])
             child_x, child_y, child_th = round_off(child_x, child_y, degrees(child_th))
             if (child_x, child_y, child_th) == path_node:
-                req_rpms.append(child_rpm)
+                req_rpms.append([child_rpm, th, t_max])
                 for sub_path_node in sub_path:
-                    nav_space_disp = cv2.line(nav_space_disp, (sub_path_node[0][0], int(10000/scale-1-sub_path_node[1][0])), (sub_path_node[0][1], int(10000/scale-1-sub_path_node[1][1])), (255,0,0), 2)
+                    nav_space_disp = cv2.line(nav_space_disp, (int(sub_path_node[0][0]), int(10000/scale-1-sub_path_node[1][0])), (int(sub_path_node[0][1]), int(10000/scale-1-sub_path_node[1][1])), (255,0,0), 2)
                 break
+        prev_node = path_node        
 
-        prev_node = path_node
-        
     return req_rpms, nav_space_disp
-
-    # grid_disp = grid.astype(np.uint8)
-    # grid_disp = cv2.resize(grid_disp, (int(grid_size/10), int(grid_size/10)))
-    # cv2.imshow('grid_disp', grid_disp)
-    # cv2.waitKey(0)
 
 
 if __name__ == '__main__':
@@ -222,6 +214,8 @@ if __name__ == '__main__':
     num_generated = 1
     if not os.path.exists('./results'):
         os.makedirs('./results')
+    f_wr = open('solution_actions.txt', 'w+')
+    f_wr.write('Left_RPM Right_RPM angle(radians)_at_which_this_action_should_be_applied time_at_which_this_action_should_be_applied\n')
 
     nav_space, grid, nav_space_disp = main(clearance, False, scale_down=scale) # navigable space
     if not valid_location(start_node, nav_space):
@@ -241,13 +235,13 @@ if __name__ == '__main__':
             req_rpms, nav_space_disp = visualize(10000, grid, path, nav_space_disp)
             cv2.imwrite('./results/final_path.jpg', nav_space_disp)
             print('\n\nreq_rpms', req_rpms)
+            for req_rpm in req_rpms:
+                f_wr.write('{} {} {} {}\n'.format(req_rpm[0][0], req_rpm[0][1], req_rpm[1], req_rpm[2]))
             break
         else:
             num_generated, nav_space_disp, open_q = generate_children(curr_node, goal_node, rpms, num_generated, nodes, nav_space, open_q, scale, nav_space_disp)
-            for idx in range(len(open_q)):
-                print(open_q[idx][0], open_q[idx][1], open_q[idx][2].x, open_q[idx][2].y, open_q[idx][2].th)
             if 1:
                 cv2.imshow('nav_space_disp', nav_space_disp)
                 cv2.waitKey(5)
-                cv2.imwrite('./results/explore_{}.jpg'.format(num_runs), nav_space_disp)
+                cv2.imwrite('./results/explore_'+str(num_runs).zfill(5)+'.jpg', nav_space_disp)
         num_runs += 1

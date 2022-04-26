@@ -96,13 +96,6 @@ class Arena():
             return True
         return False
 
-if __name__ == '__main__':
-    clearance = 300
-    diameter = 210 #mm Robot diameter
-    L = 160 #mm. Distance b/w wheels
-    grid_size = int(1e4) #in mm.
-    arena = Arena(clearance, diameter, True, grid_size)
-    print(arena.is_navigable(999, 999))
 
 def main(clearance, display, scale_down):
         diameter = 210 #mm Robot diameter
