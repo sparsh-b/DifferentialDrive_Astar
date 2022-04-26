@@ -140,7 +140,7 @@ def visualize(grid_size, grid, path):
     prev_node = path[-1]
     req_rpms = []
     for path_node in path[::-1]:
-        plt.plot([prev_node[0], path_node[0]], [prev_node[1], path_node[1]], color="red")
+        # plt.plot([prev_node[0], path_node[0]], [prev_node[1], path_node[1]], color="red")
         
         rpm0 = [   0   , rpms[0]]
         rpm1 = [rpms[0],    0   ]
@@ -155,6 +155,7 @@ def visualize(grid_size, grid, path):
         L = 354 #in mm
         dt = 0.1 #in seconds
         th = radians(prev_node[2])
+        
         for child_rpm in eight_rpms:
             t = 0
             child_x = prev_node[0]
@@ -163,18 +164,25 @@ def visualize(grid_size, grid, path):
             additional_cost = 0
             common_multiple = 0.5*r * (child_rpm[0] + child_rpm[1]) * dt
             dth = (r/L) * (child_rpm[0] - child_rpm[1]) * dt
+            sub_path = []
             while t<1:
                 t += dt
                 dx = common_multiple * cos(child_th)
                 dy = common_multiple * sin(child_th)
+                xs = child_x
+                ys = child_y
                 child_x += dx
                 child_y += dy
                 child_th+= dth
                 additional_cost += sqrt(pow((common_multiple * cos(child_th)),2) + pow((common_multiple * sin(child_th)),2))
+                sub_path.append([[xs, child_x], [ys, child_y]])
             child_x, child_y, child_th = round_off(child_x, child_y, degrees(child_th))
             if (child_x, child_y, child_th) == path_node:
                 req_rpms.append(child_rpm)
+                for sub_path_node in sub_path:
+                    plt.plot(sub_path_node[0], sub_path_node[1], color="red")
                 break
+
         prev_node = path_node
         
     return req_rpms
