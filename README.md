@@ -4,6 +4,12 @@
 - Rpms of 5 & 10 for the left & right wheels were used & the map is scaled down to its 40th part to decerease run-time.
 - This work is jointly done by Sparsh Bhogavilli & Aneesh Dandime as part of Project3 of the course ENPM661 at UMD.
 
+# Libraries Used
+- tqdm==4.59.0
+- opencv-python==4.5.5.62
+- numpy==1.20.1
+- heapdict==1.0.1
+
 # Instructions to run
 - `cd scripts`
 - `python3 diff_drive_Astar.py --start <space-separated x y theta> --end <space-separated x y> --rpm <space-separated rpm1 & rpm2> --clearance <clearance in mm>`

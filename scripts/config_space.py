@@ -107,7 +107,7 @@ def main(clearance, display, scale_down):
         if os.path.exists('grid_{}.npy'.format(clearance)):
             grid = np.load('grid_{}.npy'.format(clearance))
         else:
-            print('Pre-Existing grid file not found. ')
+            print('Pre-Existing grid file not found. Computing it.')
             with tqdm(total = grid_size) as pbar:
                 for row in range(grid_size):
                     pbar.update(1)
@@ -126,13 +126,16 @@ def main(clearance, display, scale_down):
         if os.path.exists('nav_space_{}.npy'.format(clearance)):
             nav_space = np.load('nav_space_{}.npy'.format(clearance))
         else:
-            nav_space = np.ones((grid_size, grid_size))
-            for row in range(grid_size):
-                for col in range(grid_size):
-                    if not np.array_equal(grid[row, col], [255, 255, 255]):
-                        nav_space[row, col] = 0
-            nav_space = nav_space.astype(np.uint8)
-            np.save(open('nav_space_{}.npy'.format(clearance), 'wb'), nav_space)
+            print('Pre-Existing navigable_space file not found. Computing it.')
+            with tqdm(total = grid_size) as pbar:
+                nav_space = np.ones((grid_size, grid_size))
+                for row in range(grid_size):
+                    pbar.update(1)
+                    for col in range(grid_size):
+                        if not np.array_equal(grid[row, col], [255, 255, 255]):
+                            nav_space[row, col] = 0
+                nav_space = nav_space.astype(np.uint8)
+                np.save(open('nav_space_{}.npy'.format(clearance), 'wb'), nav_space)
 
         if display == True:
             nav_space_disp = (nav_space*255).astype(np.uint8)
@@ -149,9 +152,6 @@ def main(clearance, display, scale_down):
         if scale_down:
             nav_space = (nav_space*255).astype(np.uint8)
             nav_space_disp = cv2.resize(nav_space, (int(grid_size/scale_down), int(grid_size/scale_down)))
-            # cv2.imshow('nav_space', nav_space)
-            # cv2.waitKey(0)
-            # print(nav_space.shape)
             nav_space = copy.copy(nav_space_disp)
             nav_space[nav_space_disp!=0] = 1
             nav_space_disp = cv2.cvtColor(nav_space_disp, cv2.COLOR_GRAY2BGR)
