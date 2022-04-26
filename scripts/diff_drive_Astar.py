@@ -1,5 +1,4 @@
 import copy
-import matplotlib.pyplot as plt
 import os
 from tqdm.autonotebook import tqdm
 import cv2 
@@ -16,14 +15,15 @@ class Node():
         self.y = y
         self.th = th
 
-    def print(self):
-        print(self.x, self.y, self.th)
-
     def __eq__(self, __o) -> bool:
         if (self.x == __o.x) and (self.y == __o.y) and (self.th == __o.th):
             return True
         else:
             return False
+    
+    def __str__(self):
+        return 'x:{}\ty:{}\tth:{}\n'.format(self.x, self.y, self.th)
+
 
 def euclidean_dist(node1, node2, node1_y= -1):
     try:
@@ -64,7 +64,7 @@ def check_if_duplicate(child_x, child_y, child_th, nodes):
     else:
         return False
 
-def generate_children(parent, goal_node, rpms, num_generated, nodes, nav_space, open_q):
+def generate_children(parent, goal_node, rpms, num_generated, nodes, nav_space, open_q, scale, nav_space_disp):
     rpm0 = [   0   , rpms[0]]
     rpm1 = [rpms[0],    0   ]
     rpm2 = [rpms[0], rpms[0]]
@@ -75,8 +75,8 @@ def generate_children(parent, goal_node, rpms, num_generated, nodes, nav_space, 
     rpm7 = [rpms[0], rpms[1]]
     eight_rpms = [rpm0,rpm1,rpm2,rpm3,rpm4,rpm5,rpm6,rpm7]
     # eight_rpms = [rpm7]
-    r = 38 #in mm
-    L = 354 #in mm
+    r = 38/scale #in mm
+    L = 354/scale #in mm
     dt = 0.1 #in seconds
     x = parent.x
     y = parent.y
@@ -102,46 +102,45 @@ def generate_children(parent, goal_node, rpms, num_generated, nodes, nav_space, 
             child_y += dy
             child_th+= dth
             additional_cost += sqrt(pow((common_multiple * cos(child_th)),2) + pow((common_multiple * sin(child_th)),2))
-            plt.plot([xs, child_x], [ys, child_y], color="blue")
+            nav_space_disp = cv2.line(nav_space_disp, (int(xs), int(10000/scale-1-ys)), (int(child_x), int(10000/scale-1-child_y)), (255,0,0), 1)
         child_x, child_y, child_th = round_off(child_x, child_y, degrees(child_th))
-        # child_x, child_y, child_th, additional_cost = eight_moves(rpms, parent)
         new_cost = child_common_cost + additional_cost + euclidean_dist(child_x, goal_node, child_y)
+        print('[{},{}]: ({},{}) -> ({},{}) | {}'.format(child_rpm[0], child_rpm[1], parent.x, parent.y, child_x, child_y, new_cost))
 
         if (child_x < 0) or (child_y < 0):
             continue
-        if (child_x >= 10000) or (child_y >= 10000):
+        if (child_x >= 10000/scale) or (child_y >= 10000/scale):
             continue
-        if nav_space[10000-1-child_y, child_x] == 0:
-            print('row, col:', 10000-1-child_y, child_x)
+        if nav_space[int(10000/scale-1-child_y), child_x] == 0:
+            print(child_x, child_y, '#######')
             continue
-        print(child_x, child_y, child_th, '<-', parent.x, parent.y, parent.th)
-
+        
         if check_if_duplicate(child_x, child_y, child_th, nodes):
             prev_cost = nodes[(child_x, child_y, child_th)]['cost']
             if new_cost < prev_cost:
-                # num_generated += 1
                 nodes[(child_x, child_y, child_th)] = {'parentx': parent.x, 'parenty': parent.y, 'parentth': parent.th, 'cost': new_cost}
                 for idx in range(len(open_q)):
                     if open_q[idx][2] == Node(child_x, child_y, child_th):
                         open_q[idx] = (new_cost, open_q[idx][1], open_q[idx][2])
                         hq.heapify(open_q)
+            else:
+                print(child_x, child_y, '@@@@@@@')
         else:
             num_generated += 1
             nodes[(child_x, child_y, child_th)] =  {'parentx': parent.x, 'parenty': parent.y, 'parentth': parent.th, 'cost': new_cost}
             hq.heappush(open_q, (new_cost, num_generated, Node(child_x, child_y, child_th)))
-    return num_generated
+            hq.heapify(open_q)
+    return num_generated, nav_space_disp, open_q
 
-def valid_start_and_goal(start_node, goal_node, nav_space):
-    if (nav_space[start_node.x, start_node.y] == 1) and (nav_space[goal_node.x, goal_node.y] == 1):
+def valid_location(start_node, nav_space):
+    if nav_space[start_node.x, start_node.y] == 1:
         return True
     return False
 
-def visualize(grid_size, grid, path):
+def visualize(grid_size, grid, path, nav_space_disp):
     prev_node = path[-1]
     req_rpms = []
     for path_node in path[::-1]:
-        # plt.plot([prev_node[0], path_node[0]], [prev_node[1], path_node[1]], color="red")
-        
         rpm0 = [   0   , rpms[0]]
         rpm1 = [rpms[0],    0   ]
         rpm2 = [rpms[0], rpms[0]]
@@ -151,8 +150,8 @@ def visualize(grid_size, grid, path):
         rpm6 = [rpms[1], rpms[0]]
         rpm7 = [rpms[0], rpms[1]]
         eight_rpms = [rpm0,rpm1,rpm2,rpm3,rpm4,rpm5,rpm6,rpm7]
-        r = 38 #in mm
-        L = 354 #in mm
+        r = 38/scale #in mm
+        L = 354/scale #in mm
         dt = 0.1 #in seconds
         th = radians(prev_node[2])
         
@@ -180,12 +179,12 @@ def visualize(grid_size, grid, path):
             if (child_x, child_y, child_th) == path_node:
                 req_rpms.append(child_rpm)
                 for sub_path_node in sub_path:
-                    plt.plot(sub_path_node[0], sub_path_node[1], color="red")
+                    nav_space_disp = cv2.line(nav_space_disp, (sub_path_node[0][0], int(10000/scale-1-sub_path_node[1][0])), (sub_path_node[0][1], int(10000/scale-1-sub_path_node[1][1])), (255,0,0), 2)
                 break
 
         prev_node = path_node
         
-    return req_rpms
+    return req_rpms, nav_space_disp
 
     # grid_disp = grid.astype(np.uint8)
     # grid_disp = cv2.resize(grid_disp, (int(grid_size/10), int(grid_size/10)))
@@ -204,25 +203,34 @@ if __name__ == '__main__':
     rpms = args.rpm
     start = args.start
     goal = args.goal
-    clearance = args.clearance
-    threshold = 100 # in mm - distance b/w bot & goal to consider that bot arrived at goal
+    scale = 40 # size down the 10000x10000 grid to its `scale`th part.
+    start = [start[0]/scale, start[1]/scale, start[2]]
+    goal  = [goal[0]/scale, goal[1]/scale]
+    clearance = args.clearance #/scale is not required here
+    threshold = 100/scale # in mm - distance b/w bot & goal to consider that bot arrived at goal
     reached_goal = False
-    fig, ax = plt.subplots()
 
     start_node = Node(*round_off(*start))
-    goal_node = Node(*goal, -1)
+    goal_node = Node(*round_off(*goal, -1)[:-1], -1)
     open_q = []
     closed_q = []
     hq.heappush(open_q, (0, 0, start_node)) #cost, added_index, node
+    hq.heapify(open_q)
     nodes = {} # maintains track of all generated nodes
     # key:tuple having x,y&th coordinates of a node, value:dictionary containing parent node & cost
     nodes[tuple(round_off(start_node.x, start_node.y, start_node.th))] = {'parentx': -1, 'parenty': -1, 'parentth':-1, 'cost': euclidean_dist(start_node, goal_node)}
     num_generated = 1
+    if not os.path.exists('./results'):
+        os.makedirs('./results')
 
-    nav_space, grid = main(clearance, False) # navigable space
-    if not valid_start_and_goal(start_node, goal_node, nav_space):
-        print("Start & goal nodes aren't in valid locations. Please try again.")
+    nav_space, grid, nav_space_disp = main(clearance, False, scale_down=scale) # navigable space
+    if not valid_location(start_node, nav_space):
+        print("Start node isn't in valid location. Please try again.")
         exit()
+    if not valid_location(goal_node, nav_space):
+        print("Goal node isn't in valid location. Please try again.")
+        exit()
+    num_runs = 0
     while (not reached_goal) and (len(open_q) != 0):
         _, _, curr_node = hq.heappop(open_q)
         closed_q.append(curr_node)
@@ -230,20 +238,16 @@ if __name__ == '__main__':
             path = backtrack(curr_node)
             reached_goal = True
             print('\n\nGenerated Path:', path[::-1])
-            req_rpms = visualize(10000, grid, path)
+            req_rpms, nav_space_disp = visualize(10000, grid, path, nav_space_disp)
+            cv2.imwrite('./results/final_path.jpg', nav_space_disp)
             print('\n\nreq_rpms', req_rpms)
             break
         else:
-            num_generated = generate_children(curr_node, goal_node, rpms, num_generated, nodes, nav_space, open_q)
-            # break
-            # if num_generated > 20:
-            #     break
-
-    plt.grid()
-    ax.set_aspect('equal')
-    plt.xlim(0,10000)
-    plt.ylim(0,10000)
-    plt.title('How to plot a vector in matplotlib ?',fontsize=10)
-    plt.show()
-    plt.savefig('path_{}-{}-{}_to_{}-{}.png'.format(*round_off(*start), *goal))
-    plt.close()
+            num_generated, nav_space_disp, open_q = generate_children(curr_node, goal_node, rpms, num_generated, nodes, nav_space, open_q, scale, nav_space_disp)
+            for idx in range(len(open_q)):
+                print(open_q[idx][0], open_q[idx][1], open_q[idx][2].x, open_q[idx][2].y, open_q[idx][2].th)
+            if 1:
+                cv2.imshow('nav_space_disp', nav_space_disp)
+                cv2.waitKey(5)
+                cv2.imwrite('./results/explore_{}.jpg'.format(num_runs), nav_space_disp)
+        num_runs += 1

@@ -1,3 +1,4 @@
+import copy
 import os
 from tqdm.autonotebook import tqdm
 import cv2 
@@ -95,7 +96,15 @@ class Arena():
             return True
         return False
 
-def main(clearance, display):
+if __name__ == '__main__':
+    clearance = 300
+    diameter = 210 #mm Robot diameter
+    L = 160 #mm. Distance b/w wheels
+    grid_size = int(1e4) #in mm.
+    arena = Arena(clearance, diameter, True, grid_size)
+    print(arena.is_navigable(999, 999))
+
+def main(clearance, display, scale_down):
         diameter = 210 #mm Robot diameter
         L = 160 #mm. Distance b/w wheels
         grid_size = int(1e4) #in mm.
@@ -134,7 +143,7 @@ def main(clearance, display):
 
         if display == True:
             nav_space_disp = (nav_space*255).astype(np.uint8)
-            nav_space_disp = cv2.resize(nav_space_disp, (int(grid_size/10), int(grid_size/10)))
+            nav_space_disp = cv2.resize(nav_space_disp, (int(grid_size/scale_down), int(grid_size/scale_down)))
 
             cv2.imshow('nav_space_disp', nav_space_disp)
 
@@ -144,4 +153,14 @@ def main(clearance, display):
             cv2.imwrite('empty_grid.jpg', grid_disp)
             cv2.waitKey(0)
 
-        return nav_space, grid
+        if scale_down:
+            nav_space = (nav_space*255).astype(np.uint8)
+            nav_space_disp = cv2.resize(nav_space, (int(grid_size/scale_down), int(grid_size/scale_down)))
+            # cv2.imshow('nav_space', nav_space)
+            # cv2.waitKey(0)
+            # print(nav_space.shape)
+            nav_space = copy.copy(nav_space_disp)
+            nav_space[nav_space_disp!=0] = 1
+            nav_space_disp = cv2.cvtColor(nav_space_disp, cv2.COLOR_GRAY2BGR)
+
+        return nav_space, grid, nav_space_disp
