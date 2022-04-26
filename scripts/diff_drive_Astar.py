@@ -177,7 +177,7 @@ def visualize(grid_size, grid, path, nav_space_disp):
             if (child_x, child_y, child_th) == path_node:
                 req_rpms.append([child_rpm, th, t_max])
                 for sub_path_node in sub_path:
-                    nav_space_disp = cv2.line(nav_space_disp, (int(sub_path_node[0][0]), int(10000/scale-1-sub_path_node[1][0])), (int(sub_path_node[0][1]), int(10000/scale-1-sub_path_node[1][1])), (255,0,0), 2)
+                    nav_space_disp = cv2.line(nav_space_disp, (int(sub_path_node[0][0]), int(10000/scale-1-sub_path_node[1][0])), (int(sub_path_node[0][1]), int(10000/scale-1-sub_path_node[1][1])), (0,0,255), 2)
                 break
         prev_node = path_node        
 
