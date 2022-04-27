@@ -91,7 +91,7 @@ def generate_children(parent, goal_node, rpms, num_generated, nodes, nav_space, 
         child_th= th
         additional_cost = 0
         common_multiple = 0.5*r * (child_rpm[0] + child_rpm[1]) * dt
-        dth = (r/L) * (child_rpm[0] - child_rpm[1]) * dt
+        dth = (r/L) * (child_rpm[1] - child_rpm[0]) * dt
         while t<1:
             t += dt
             dx = common_multiple * cos(child_th)
@@ -137,7 +137,8 @@ def valid_location(start_node, nav_space):
 def visualize(grid_size, grid, path, nav_space_disp):
     prev_node = path[-1]
     req_rpms = []
-    for path_node in path[::-1]:
+    count = 0
+    for path_node in path[::-1][1:]:
         rpm0 = [   0   , rpms[0]]
         rpm1 = [rpms[0],    0   ]
         rpm2 = [rpms[0], rpms[0]]
@@ -152,7 +153,7 @@ def visualize(grid_size, grid, path, nav_space_disp):
         dt = 0.1 #in seconds
         t_max = 1
         th = radians(prev_node[2])
-        
+        count += 1
         for child_rpm in eight_rpms:
             t = 0
             child_x = prev_node[0]
@@ -160,7 +161,7 @@ def visualize(grid_size, grid, path, nav_space_disp):
             child_th= th
             additional_cost = 0
             common_multiple = 0.5*r * (child_rpm[0] + child_rpm[1]) * dt
-            dth = (r/L) * (child_rpm[0] - child_rpm[1]) * dt
+            dth = (r/L) * (child_rpm[1] - child_rpm[0]) * dt
             sub_path = []
             while t<t_max:
                 t += dt
@@ -178,8 +179,12 @@ def visualize(grid_size, grid, path, nav_space_disp):
                 req_rpms.append([child_rpm, th, t_max])
                 for sub_path_node in sub_path:
                     nav_space_disp = cv2.line(nav_space_disp, (int(sub_path_node[0][0]), int(10000/scale-1-sub_path_node[1][0])), (int(sub_path_node[0][1]), int(10000/scale-1-sub_path_node[1][1])), (0,0,255), 2)
+                print(child_rpm, th)
+                cv2.imshow('nav_space_disp', nav_space_disp)
+                cv2.imwrite('temp/nav_space_disp{}.jpg'.format(count), nav_space_disp)
+                cv2.waitKey(5)
                 break
-        prev_node = path_node        
+        prev_node = copy.copy(path_node)
 
     return req_rpms, nav_space_disp
 
@@ -195,7 +200,8 @@ if __name__ == '__main__':
     rpms = args.rpm
     start = args.start
     goal = args.goal
-    scale = 40 # size down the 10000x10000 grid to its `scale`th part.
+    scale = 20 # size down the 10000x10000 grid to its `scale`th part.
+    write_waypoints = True
     start = [start[0]/scale, start[1]/scale, start[2]]
     goal  = [goal[0]/scale, goal[1]/scale]
     clearance = args.clearance #/scale is not required here
@@ -231,12 +237,18 @@ if __name__ == '__main__':
         if close_to_goal(curr_node, goal_node, threshold):
             path = backtrack(curr_node)
             reached_goal = True
-            print('\n\nGenerated Path:', path[::-1])
+            print('\n\nGenerated Path (on scaled-down map):\n', path[::-1])
             req_rpms, nav_space_disp = visualize(10000, grid, path, nav_space_disp)
             cv2.imwrite('./results/final_path.jpg', nav_space_disp)
             print('\n\nreq_rpms', req_rpms)
-            for req_rpm in req_rpms:
-                f_wr.write('{} {} {} {}\n'.format(req_rpm[0][0], req_rpm[0][1], req_rpm[1], req_rpm[2]))
+            path = path[::-1]
+            if write_waypoints:
+                f_wr.write('{} {} {}\n'.format(path[0][0]*scale, path[0][1]*scale, path[0][2]))
+            for i in range(len(req_rpms)):
+                if write_waypoints:
+                    f_wr.write('{} {} {} {} {} {}\n'.format(path[i+1][0]*scale, path[i+1][1]*scale, req_rpms[i][0][0], req_rpms[i][0][1], req_rpms[i][1], req_rpms[i][2]))
+                else:
+                    f_wr.write('{} {} {} {}\n'.format(req_rpms[i][0][0], req_rpms[i][0][1], req_rpms[i][1], req_rpms[i][2]))
             break
         else:
             num_generated, nav_space_disp, open_q = generate_children(curr_node, goal_node, rpms, num_generated, nodes, nav_space, open_q, scale, nav_space_disp)
@@ -245,3 +257,4 @@ if __name__ == '__main__':
                 cv2.waitKey(5)
                 cv2.imwrite('./results/explore_'+str(num_runs).zfill(5)+'.jpg', nav_space_disp)
         num_runs += 1
+    f_wr.close()
