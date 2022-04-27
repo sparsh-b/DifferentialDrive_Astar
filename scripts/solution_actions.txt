@@ -1,5 +1,5 @@
 Left_RPM Right_RPM angle(radians)_at_which_this_action_should_be_applied time_at_which_this_action_should_be_applied
-1000 1000 68.0
+1000 1000 0
 1400 1000 10 10 0.0 1
 1480 960 5 0 0.0 1
 1760 880 5 10 5.689773361501515 1
